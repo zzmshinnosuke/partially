@@ -31,33 +31,33 @@ if __name__ == '__main__':
     val_loader = DataLoader(
         dataset=val_dataset, batch_size=opts.batch_size, num_workers=opts.workers)
 
-    model = TripletNetwork().load_from_checkpoint(checkpoint_path="saved_model/deepemd-sketchycoco-epoch=99-top10=0.94.ckpt")
+    # model = TripletNetwork().load_from_checkpoint(checkpoint_path="saved_model/deepemd-sketchycoco-epoch=99-top10=0.94.ckpt")
     # model = TripletNetwork().load_from_checkpoint(checkpoint_path="saved_model/deepemd-photosketching-epoch=29-top10=1.00.ckpt")
-    # model = TripletNetwork()
+    model = TripletNetwork()
 
-    # logger = TensorBoardLogger("tb_logs", name="deepemd-photosketching")
+    logger = TensorBoardLogger("tb_logs", name="deepemd-photosketching")
 
-    # checkpoint_callback = ModelCheckpoint(monitor="top5",
-    #             mode="max",
-    #             dirpath="saved_model",
-    #             save_top_k=3,
-    #             filename="deepemd-photosketching-{epoch:02d}-{top10:.2f}")
+    checkpoint_callback = ModelCheckpoint(monitor="top5",
+                mode="max",
+                dirpath="saved_model",
+                save_top_k=3,
+                filename="deepemd-photosketching-{epoch:02d}-{top10:.2f}")
 
-    # trainer = Trainer(gpus=-1, auto_select_gpus=True, # specifies all available GPUs
-    #             # auto_scale_batch_size=True,
-    #             # auto_lr_find=True,
-    #             benchmark=True,
-    #             check_val_every_n_epoch=10,
-    #             max_epochs=100000,
-    #             # precision=64,
-    #             min_steps=100, min_epochs=0,
-    #             accumulate_grad_batches=8,
-    #             # profiler="advanced",
-    #             # resume_from_checkpoint="saved_model/deepemd-epoch=119-top10=0.60.ckpt", # "some/path/to/my_checkpoint.ckpt"
-    #             logger=logger,
-    #             callbacks=[checkpoint_callback])
+    trainer = Trainer(gpus=-1, auto_select_gpus=True, # specifies all available GPUs
+                # auto_scale_batch_size=True,
+                # auto_lr_find=True,
+                benchmark=True,
+                check_val_every_n_epoch=1,
+                max_epochs=100000,
+                # precision=64,
+                min_steps=100, min_epochs=0,
+                accumulate_grad_batches=8,
+                # profiler="advanced",
+                # resume_from_checkpoint="saved_model/deepemd-epoch=119-top10=0.60.ckpt", # "some/path/to/my_checkpoint.ckpt"
+                logger=logger,
+                callbacks=[checkpoint_callback])
 
-    # trainer.fit(model, train_loader, val_loader)
+    trainer.fit(model, train_loader, val_loader)
 
     top1 = []
     top10 = []

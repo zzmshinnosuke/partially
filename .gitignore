@@ -1,2 +1,5 @@
 src/saved_model
+saved_model/
+tb_logs/
+.ipynb_checkpoints/
 __pycache__

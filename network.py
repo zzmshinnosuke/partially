@@ -3,7 +3,6 @@ import torch
 import torchvision
 import torch.nn as nn
 import torchvision.models as backbone_
-import encoding
 import torch.nn.functional as F
 
 
@@ -53,6 +52,7 @@ class Inception_Network(nn.Module):
         super(Inception_Network, self).__init__()
         backbone = backbone_.inception_v3(pretrained=True)
 
+        import encoding
         #self.backbone.aux_logits = False
         self.Conv2d_1a_3x3 = backbone.Conv2d_1a_3x3
         self.Conv2d_2a_3x3 = backbone.Conv2d_2a_3x3
