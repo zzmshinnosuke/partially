@@ -19,6 +19,349 @@ from scipy.io import loadmat
 from PIL import Image, ImageOps
 import torch
 
+class SFSD(torch.utils.data.Dataset):
+
+    def __init__(self, opt, mode='train', transform=None, return_orig=False):
+        self.opt = opt
+        self.transform = transform
+        self.return_orig = return_orig
+        self.mode = mode
+
+        file_name = 'train_names.txt' if self.mode == 'train' else 'test_names.txt'
+        filepath = os.path.join(self.opt.root_dir, file_name)
+        self.all_ids = []
+        with open(filepath, 'r') as file:
+            for line in file:
+                self.all_ids.append(line.strip())
+
+        print ('total %s samples: %d'%(self.mode, len(self.all_ids)))
+
+    def __len__(self):
+        return len(self.all_ids)
+
+    def __getitem__(self, index):
+        filename = self.all_ids[index]
+        sketch_file = os.path.join(self.opt.root_dir, 'sketchImgs', '%s.png'%filename)
+        # sketch_data = loadmat(os.path.join(self.opt.root_dir, 'Annotation', 'paper_version', self.mode, 'INSTANCE_GT', '%s.mat'%filename))['INSTANCE_GT']
+        image_file = os.path.join(self.opt.root_dir, 'images', '%s.jpg'%filename)
+        negative_file = os.path.join(self.opt.root_dir, 'images', '%s.jpg'%np.random.choice(self.all_ids, 1)[0])
+
+        sketch_data = Image.open(sketch_file).convert('RGB')
+        image_data = Image.open(image_file).convert('RGB')
+        negative_data = Image.open(negative_file).convert('RGB')
+
+        # Partial data
+        sketch_data = self.partial_data(sketch_data, p_mask=self.opt.p_mask)
+        sketch_data = Image.fromarray(sketch_data).convert('RGB')
+
+        sketch_data = ImageOps.pad(sketch_data, size=(self.opt.max_len, self.opt.max_len))
+        image_data = ImageOps.pad(image_data, size=(self.opt.max_len, self.opt.max_len))
+        negative_data = ImageOps.pad(negative_data, size=(self.opt.max_len, self.opt.max_len))
+
+        if self.transform:
+            sk_tensor = self.transform(sketch_data)
+            img_tensor = self.transform(image_data)
+            neg_tensor = self.transform(negative_data)
+
+        if self.return_orig:
+            return sk_tensor, img_tensor, neg_tensor, sketch_data, image_data, negative_data
+        else:
+            return sk_tensor, img_tensor, neg_tensor
+
+    def partial_data(self, sketch_data, p_mask):
+        sketch_data = np.array(sketch_data, dtype=np.uint8)
+        H, W = sketch_data.shape[:2]
+        del_h = int(H*(p_mask**0.5))
+        del_w = int(W*(p_mask**0.5))
+        h = int(np.random.uniform(0, H-del_h))
+        w = int(np.random.uniform(0, W-del_w))
+        sketch_data[h:h+del_h, w:w+del_w, :] = 255
+        return sketch_data
+
+class FSCOCO(torch.utils.data.Dataset):
+    def __init__(self, opt, mode='train', transform=None, return_orig=False):
+        self.opt = opt
+        self.transform = transform
+        self.return_orig = return_orig
+        self.mode = mode
+
+        file_name = 'FScocoTrain.txt' if self.mode == 'train' else 'FScocoTest.txt'
+        filepath = os.path.join(self.opt.root_dir, file_name)
+        self.all_ids = []
+        with open(filepath, 'r') as file:
+            for line in file:
+                self.all_ids.append(line.strip())
+
+        print ('total %s samples: %d'%(self.mode, len(self.all_ids)))
+
+    def __len__(self):
+        return len(self.all_ids)
+
+    def __getitem__(self, index):
+        filename = self.all_ids[index]
+        sketch_file = os.path.join(self.opt.root_dir, 'raster_sketches', '%s.jpg'%filename)
+        # sketch_data = loadmat(os.path.join(self.opt.root_dir, 'Annotation', 'paper_version', self.mode, 'INSTANCE_GT', '%s.mat'%filename))['INSTANCE_GT']
+        image_file = os.path.join(self.opt.root_dir, 'images', '%s.jpg'%filename)
+        negative_file = os.path.join(self.opt.root_dir, 'images', '%s.jpg'%np.random.choice(self.all_ids, 1)[0])
+
+        sketch_data = Image.open(sketch_file).convert('RGB')
+        image_data = Image.open(image_file).convert('RGB')
+        negative_data = Image.open(negative_file).convert('RGB')
+
+        # Partial data
+        sketch_data = self.partial_data(sketch_data, p_mask=self.opt.p_mask)
+        sketch_data = Image.fromarray(sketch_data).convert('RGB')
+
+        sketch_data = ImageOps.pad(sketch_data, size=(self.opt.max_len, self.opt.max_len))
+        image_data = ImageOps.pad(image_data, size=(self.opt.max_len, self.opt.max_len))
+        negative_data = ImageOps.pad(negative_data, size=(self.opt.max_len, self.opt.max_len))
+
+        if self.transform:
+            sk_tensor = self.transform(sketch_data)
+            img_tensor = self.transform(image_data)
+            neg_tensor = self.transform(negative_data)
+
+        if self.return_orig:
+            return sk_tensor, img_tensor, neg_tensor, sketch_data, image_data, negative_data
+        else:
+            return sk_tensor, img_tensor, neg_tensor
+
+    def partial_data(self, sketch_data, p_mask):
+        sketch_data = np.array(sketch_data, dtype=np.uint8)
+        H, W = sketch_data.shape[:2]
+        del_h = int(H*(p_mask**0.5))
+        del_w = int(W*(p_mask**0.5))
+        h = int(np.random.uniform(0, H-del_h))
+        w = int(np.random.uniform(0, W-del_w))
+        sketch_data[h:h+del_h, w:w+del_w, :] = 255
+        return sketch_data
+
+
+class SketchyCOCO_lf(torch.utils.data.Dataset):
+
+    def __init__(self, opt, mode='train', transform=None, return_orig=False):
+        self.opt = opt
+        self.transform = transform
+        self.return_orig = return_orig
+        self.mode = mode
+
+        self.all_ids = glob.glob(os.path.join(
+            self.opt.root_dir, self.mode, 'sketch', '*.png'))
+        self.all_ids = [os.path.split(filepath)[-1][:-4] 
+            for filepath in self.all_ids]
+        print ('total %s samples: %d'%(self.mode, len(self.all_ids)))
+
+    def __len__(self):
+        return len(self.all_ids)
+
+    def __getitem__(self, index):
+        filename = self.all_ids[index]
+        sketch_file = os.path.join(self.opt.root_dir, self.mode, 'sketch', '%s.png'%filename)
+        # sketch_data = loadmat(os.path.join(self.opt.root_dir, 'Annotation', 'paper_version', self.mode, 'INSTANCE_GT', '%s.mat'%filename))['INSTANCE_GT']
+        image_file = os.path.join(self.opt.root_dir, self.mode, 'image', '%s.png'%filename)
+        negative_file = os.path.join(self.opt.root_dir, self.mode, 'image', '%s.png'%np.random.choice(self.all_ids, 1)[0])
+
+        sketch_data = Image.open(sketch_file).convert('RGB')
+        image_data = Image.open(image_file).convert('RGB')
+        negative_data = Image.open(negative_file).convert('RGB')
+
+        # Partial data
+        sketch_data = self.partial_data(sketch_data, p_mask=self.opt.p_mask)
+        sketch_data = Image.fromarray(sketch_data).convert('RGB')
+
+        sketch_data = ImageOps.pad(sketch_data, size=(self.opt.max_len, self.opt.max_len))
+        image_data = ImageOps.pad(image_data, size=(self.opt.max_len, self.opt.max_len))
+        negative_data = ImageOps.pad(negative_data, size=(self.opt.max_len, self.opt.max_len))
+
+        if self.transform:
+            sk_tensor = self.transform(sketch_data)
+            img_tensor = self.transform(image_data)
+            neg_tensor = self.transform(negative_data)
+
+        if self.return_orig:
+            return sk_tensor, img_tensor, neg_tensor, sketch_data, image_data, negative_data
+        else:
+            return sk_tensor, img_tensor, neg_tensor
+
+    def partial_data(self, sketch_data, p_mask):
+        sketch_data = np.array(sketch_data, dtype=np.uint8)
+        H, W = sketch_data.shape[:2]
+        del_h = int(H*(p_mask**0.5))
+        del_w = int(W*(p_mask**0.5))
+        h = int(np.random.uniform(0, H-del_h))
+        w = int(np.random.uniform(0, W-del_w))
+        sketch_data[h:h+del_h, w:w+del_w, :] = 255
+        return sketch_data
+
+# #图片格式
+# class FScoco(torch.utils.data.Dataset):
+#     def __init__(self, opt, mode='train', transform=None, return_orig=False):
+#         self.opt = opt
+#         self.transform = transform
+#         self.return_orig = return_orig
+
+#         self.image_dir = os.path.join(self.opt.root_dir, 'images')
+#         self.sketch_dir = os.path.join(self.opt.root_dir, 'sketchycoco')
+#         # train:test=7000:3000
+#         if mode == 'train':
+#             self.all_ids = np.loadtxt(os.path.join(self.opt.root_dir, 'FScocoTrain.txt'), dtype=str)
+#         elif mode == 'test':
+#             self.all_ids = list(np.loadtxt(os.path.join(self.opt.root_dir, 'FScocoTest.txt'), dtype=str))
+#         # else:
+#         #     self.all_ids = list(np.loadtxt(os.path.join(self.opt.root_dir, 'test_img_t.txt'), dtype=str))
+#         print ('total data: ', len(self.all_ids))
+
+#     def __len__(self):
+#         return len(self.all_ids)
+
+#     def __getitem__(self, index):
+#         idx = self.all_ids[index]
+#         idn = (np.random.choice(self.all_ids, 1)[0]).split('.')[0]
+#         sketch_data = Image.open(os.path.join(self.sketch_dir, '%s.png'%idx)).convert('RGB')
+#         image_data = Image.open(os.path.join(self.image_dir, '%s.jpg'%idx)).convert('RGB')
+#         negative_data = Image.open(os.path.join(self.image_dir, '%s.jpg'%idn)).convert('RGB')
+
+#         # Partial data
+#         sketch_data = self.partial_data(sketch_data, p_mask=self.opt.p_mask)
+#         sketch_data = Image.fromarray(sketch_data).convert('RGB')
+#         # print("sk_tensor", sketch_data)
+
+#         sketch_data = ImageOps.pad(sketch_data, size=(self.opt.max_len, self.opt.max_len))
+#         image_data = ImageOps.pad(image_data, size=(self.opt.max_len, self.opt.max_len))
+#         negative_data = ImageOps.pad(negative_data, size=(self.opt.max_len, self.opt.max_len))
+
+#         if self.transform:
+#             img_tensor = self.transform(image_data)
+#             sk_tensor = self.transform(sketch_data)
+#             neg_tensor = self.transform(negative_data)
+    
+#         if self.return_orig:
+#             return sk_tensor, img_tensor, neg_tensor, sketch_data, image_data, negative_data
+#         else:
+#             return sk_tensor, img_tensor, neg_tensor
+
+#     def partial_data(self, sketch_data, p_mask):
+#         sketch_data = np.array(sketch_data, dtype=np.uint8)
+#         H, W = sketch_data.shape[:2]
+#         del_h = int(H*(p_mask**0.5))
+#         del_w = int(W*(p_mask**0.5))
+#         h = int(np.random.uniform(0, H-del_h))
+#         w = int(np.random.uniform(0, W-del_w))
+#         sketch_data[h:h+del_h, w:w+del_w, :] = 255
+#         return sketch_data
+
+#图片格式
+# class SFSD1(torch.utils.data.Dataset):
+#     def __init__(self, opt, mode='train', transform=None, return_orig=False):
+#         self.opt = opt
+#         self.transform = transform
+#         self.return_orig = return_orig
+
+#         self.image_dir = os.path.join(self.opt.root_dir, 'images')
+#         self.sketch_dir = os.path.join(self.opt.root_dir, 'sketchImg')
+#         # train:test=3:1
+#         if mode == 'train':
+#             self.all_ids = np.loadtxt(os.path.join(self.opt.root_dir, 'train_img.txt'), dtype=str)
+#         elif mode == 'test':
+#             self.all_ids = list(np.loadtxt(os.path.join(self.opt.root_dir, 'test_img.txt'), dtype=str))
+#         # else:
+#         #     self.all_ids = list(np.loadtxt(os.path.join(self.opt.root_dir, 'test_img_t.txt'), dtype=str))
+#         print ('total data: ', len(self.all_ids))
+
+#     def __len__(self):
+#         return len(self.all_ids)
+
+#     def __getitem__(self, index):
+#         idx = self.all_ids[index]
+#         idn = (np.random.choice(self.all_ids, 1)[0]).split('.')[0]
+#         sketch_data = Image.open(os.path.join(self.sketch_dir, '%s.jpeg'%idx)).convert('RGB')
+#         image_data = Image.open(os.path.join(self.image_dir, '%s.jpg'%idx)).convert('RGB')
+#         negative_data = Image.open(os.path.join(self.image_dir, '%s.jpg'%idn)).convert('RGB')
+
+#         # Partial data
+#         sketch_data = self.partial_data(sketch_data, p_mask=self.opt.p_mask)
+#         sketch_data = Image.fromarray(sketch_data).convert('RGB')
+#         # print("sk_tensor", sketch_data)
+
+#         sketch_data = ImageOps.pad(sketch_data, size=(self.opt.max_len, self.opt.max_len))
+#         image_data = ImageOps.pad(image_data, size=(self.opt.max_len, self.opt.max_len))
+#         negative_data = ImageOps.pad(negative_data, size=(self.opt.max_len, self.opt.max_len))
+
+#         if self.transform:
+#             img_tensor = self.transform(image_data)
+#             sk_tensor = self.transform(sketch_data)
+#             neg_tensor = self.transform(negative_data)
+    
+#         if self.return_orig:
+#             return sk_tensor, img_tensor, neg_tensor, sketch_data, image_data, negative_data
+#         else:
+#             return sk_tensor, img_tensor, neg_tensor
+
+#     def partial_data(self, sketch_data, p_mask):
+#         sketch_data = np.array(sketch_data, dtype=np.uint8)
+#         H, W = sketch_data.shape[:2]
+#         del_h = int(H*(p_mask**0.5))
+#         del_w = int(W*(p_mask**0.5))
+#         h = int(np.random.uniform(0, H-del_h))
+#         w = int(np.random.uniform(0, W-del_w))
+#         sketch_data[h:h+del_h, w:w+del_w, :] = 255
+#         return sketch_data
+
+#mat格式
+# class SFSD(torch.utils.data.Dataset):
+#     def __init__(self, opt, mode='train', transform=None, return_orig=False):
+#         self.opt = opt
+#         self.transform = transform
+#         self.return_orig = return_orig
+
+#         self.sketch_dir = os.path.join(self.opt.root_dir, mode, 'INSTANCE_GT')
+#         self.image_dir = os.path.join(self.opt.root_dir, mode, 'reference_image')
+
+#         self.list_ids = self.filter(self.sketch_dir, self.image_dir)
+
+#     def filter(self, sketch_dir, image_dir):
+#         ''' Images and Sketches have some inconsistency, hence filtering is required -- although heuristic '''
+#         list_sk_ids = [int(os.path.split(x)[-1].split('_')[1]) for x in glob.glob(os.path.join(sketch_dir, '*.mat'))]
+#         list_img_ids = [int(os.path.split(x)[-1][:-4]) for x in glob.glob(os.path.join(image_dir, '*.jpg'))]
+
+#         return [x for x in list_sk_ids if x in list_img_ids] # intersection
+
+#     def __len__(self):
+#         return len(self.list_ids)
+
+#     def __getitem__(self, index):
+#         index = self.list_ids[index]
+#         sketch_data = loadmat(os.path.join(self.sketch_dir, 'sample_%d_instance.mat'%index))['INSTANCE_GT']
+#         image_data = Image.open(os.path.join(self.image_dir, '%d.jpg'%index))
+#         negative_data = Image.open(os.path.join(self.image_dir, '%d.jpg'%np.random.choice(self.list_ids, 1)[0]))
+        
+#         # Partial data
+#         sketch_data = self.partial_data(sketch_data, p_mask=self.opt.p_mask)
+#         sketch_data = Image.fromarray(sketch_data).convert('RGB')
+
+#         sketch_data = ImageOps.pad(sketch_data, size=(self.opt.max_len, self.opt.max_len))
+#         image_data = ImageOps.pad(image_data, size=(self.opt.max_len, self.opt.max_len))
+#         negative_data = ImageOps.pad(negative_data, size=(self.opt.max_len, self.opt.max_len))
+
+#         if self.transform:
+#             img_tensor = self.transform(image_data)
+#             sk_tensor = self.transform(sketch_data)
+#             neg_tensor = self.transform(negative_data)
+
+#         if self.return_orig:
+#             return sk_tensor, img_tensor, neg_tensor, sketch_data, image_data, negative_data
+#         else:
+#             return sk_tensor, img_tensor, neg_tensor
+
+#     def partial_data(self, sketch_data, p_mask):
+#         partial_sketch = np.zeros_like(sketch_data)
+#         instances = np.unique(sketch_data)[1:] # Remove 0-th element
+#         selected_instances = np.random.choice(instances, round(len(instances)*(1-p_mask)), replace=False)
+#         for obj in selected_instances:
+#             # if np.random.random_sample() > p_mask:
+#             partial_sketch[sketch_data == obj] = 255
+#         return partial_sketch
+
 class SketchyScene(torch.utils.data.Dataset):
     def __init__(self, opt, mode='train', transform=None, return_orig=False):
         self.opt = opt
@@ -75,7 +418,6 @@ class SketchyScene(torch.utils.data.Dataset):
 
 
 class SketchyCOCO(torch.utils.data.Dataset):
-
     def __init__(self, opt, mode='train', transform=None, return_orig=False):
         self.opt = opt
         self.transform = transform

@@ -2,4 +2,8 @@ src/saved_model
 saved_model/
 tb_logs/
 .ipynb_checkpoints/
+checkpoints/
+lightning_logs/
+partial_logs/
+trained_model.pth
 __pycache__

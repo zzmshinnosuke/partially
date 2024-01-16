@@ -27,7 +27,7 @@ def QP_solver(u, v, return_sim_map=False):
     u = u.permute(0, 2, 1).unsqueeze(2).repeat(1, 1, n, 1) # shape: B x m x n x c
     v = v.permute(0, 2, 1).unsqueeze(1).repeat(1, m, 1, 1) # shape: B x m x n x c
     cosine_distance_matrix = F.cosine_similarity(u, v, dim=-1) # shape: B x m x n
-    cost, flow = emd_inference_qpth(cosine_distance_matrix, s, d, form='L2')
+    cost, flow = emd_inference_qpth(cosine_distance_matrix, s, d, form='QP')
 
     if return_sim_map:
         return cost, flow
